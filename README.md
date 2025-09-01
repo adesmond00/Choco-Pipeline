@@ -11,7 +11,7 @@ Usage
 - Single file: `python choco_gen.py C:\path\to\installer.exe`
 - Folder scan: `python choco_gen.py C:\path\to\folder --recursive`
 - Custom output folder: `python choco_gen.py C:\path\to\installer.msi --out dist`
-- Choose model: `python choco_gen.py . --model gpt-4.1-mini`
+- Choose model: `python choco_gen.py . --model gpt-5-2025-08-07`
 - Skip Pester run: `python choco_gen.py . --skip-tests`
 
 What it does
@@ -23,4 +23,4 @@ What it does
 Notes
 - The tool attempts to extract product metadata on Windows via PowerShell for better defaults; otherwise it falls back to filename heuristics.
 - Pester is installed if already available; you can run the generated `Run-Pester.ps1 -InstallPester` to install for CurrentUser.
-- Configure `OPENAI_MODEL` via env var or `--model` flag. Default: `gpt-4.1-mini`.
+- Configure `OPENAI_MODEL` via env var or `--model` flag. Default: `gpt-5-2025-08-07`.

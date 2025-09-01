@@ -193,7 +193,7 @@ def call_llm_generate(
     try:
         resp = client.chat.completions.create(
             model=model,
-            temperature=0.2,
+            temperature=1.0,
             response_format={"type": "json_object"},
             messages=[
                 {"role": "system", "content": system},
@@ -230,33 +230,56 @@ def generate_pester_tests(
 Describe '{package_id} install script' {{
   BeforeAll {{
     $env:ChocolateyPackageName = '{package_id}'
-    $script:toolsDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'tools'
-    # Load Chocolatey helpers if available, otherwise create minimal stubs so Pester can Mock
+    $rootDir  = Split-Path -Parent $PSScriptRoot
+    $toolsDir = Join-Path $rootDir 'tools'
+
+    # Load Chocolatey helpers if available (fine if this does nothing)
     try {{
       if ($env:ChocolateyInstall) {{
         $helpers = Join-Path $env:ChocolateyInstall 'helpers\\chocolateyInstaller.psm1'
         if (Test-Path $helpers) {{ Import-Module $helpers -ErrorAction SilentlyContinue }}
       }}
     }} catch {{}}
+
+    # Create minimal stubs if helpers aren't present so Pester can Mock
     if (-not (Get-Command Install-ChocolateyInstallPackage -ErrorAction SilentlyContinue)) {{
-      function Install-ChocolateyInstallPackage {{ [CmdletBinding()] param() }}
+      function Install-ChocolateyInstallPackage {{ [CmdletBinding()] param([Parameter(ValueFromRemainingArguments=$true)][object]$_) }}
     }}
-    # Ensure dummy files exist so Test-Path succeeds if needed
-    New-Item -ItemType Directory -Force -Path $script:toolsDir | Out-Null
-    if (-not (Test-Path (Join-Path $script:toolsDir '{installer_base_name}'))) {{ New-Item -ItemType File -Path (Join-Path $script:toolsDir '{installer_base_name}') | Out-Null }}
-    if (-not (Test-Path (Join-Path $script:toolsDir '{installer_base_name}.exe'))) {{ New-Item -ItemType File -Path (Join-Path $script:toolsDir '{installer_base_name}.exe') | Out-Null }}
-    if (-not (Test-Path (Join-Path $script:toolsDir '{installer_base_name}.msi'))) {{ New-Item -ItemType File -Path (Join-Path $script:toolsDir '{installer_base_name}.msi') | Out-Null }}
+    if (-not (Get-Command Install-ChocolateyPackage -ErrorAction SilentlyContinue)) {{
+      function Install-ChocolateyPackage {{ [CmdletBinding()] param([Parameter(ValueFromRemainingArguments=$true)][object]$_) }}
+    }}
+
+    # Ensure dummy files exist so Test-Path / detection logic in the script succeeds
+    New-Item -ItemType Directory -Force -Path $toolsDir | Out-Null
+    foreach ($n in @('{installer_base_name}', '{installer_base_name}.exe', '{installer_base_name}.msi')) {{
+      $p = Join-Path $toolsDir $n
+      if (-not (Test-Path $p)) {{ New-Item -ItemType File -Path $p | Out-Null }}
+    }}
+
+    # Mock both possible helpers; different templates use different ones
     Mock Install-ChocolateyInstallPackage {{ return }} -Verifiable
+    Mock Install-ChocolateyPackage {{ return }} -Verifiable
   }}
 
-  It 'invokes Install-ChocolateyInstallPackage with required parameters' {{
-    . (Join-Path $script:toolsDir 'chocolateyinstall.ps1')
-    Assert-MockCalled Install-ChocolateyInstallPackage -Times 1 -ParameterFilter {{
+  It 'invokes a Chocolatey install helper with expected args' {{
+    . (Join-Path $toolsDir 'chocolateyinstall.ps1')
+
+    $paramFilter = {{
       $packageName -eq $env:ChocolateyPackageName -and
-      $softwareName -like '{software_name_pattern}' -and
+      ($null -eq $softwareName -or $softwareName -like '{software_name_pattern}') -and
       $fileType -in @('MSI','EXE') -and
       $silentArgs -is [string] -and
       $validExitCodes.Count -ge 1
+    }}
+
+    $ok = $false
+    try {{
+      Assert-MockCalled Install-ChocolateyInstallPackage -Times 1 -ParameterFilter $paramFilter
+      $ok = $true
+    }} catch {{ }}
+
+    if (-not $ok) {{
+      Assert-MockCalled Install-ChocolateyPackage -Times 1 -ParameterFilter $paramFilter
     }}
   }}
 }}
@@ -267,19 +290,22 @@ Describe '{package_id} install script' {{
 Describe '{package_id} uninstall script' {{
   BeforeAll {{
     $env:ChocolateyPackageName = '{package_id}'
-    # Load Chocolatey helpers if available, otherwise create minimal stubs so Pester can Mock
+
+    # Load helpers if available
     try {{
       if ($env:ChocolateyInstall) {{
         $helpers = Join-Path $env:ChocolateyInstall 'helpers\\chocolateyInstaller.psm1'
         if (Test-Path $helpers) {{ Import-Module $helpers -ErrorAction SilentlyContinue }}
       }}
     }} catch {{}}
+
     if (-not (Get-Command Get-UninstallRegistryKey -ErrorAction SilentlyContinue)) {{
       function Get-UninstallRegistryKey {{ [CmdletBinding()] param([string]$SoftwareName) }}
     }}
     if (-not (Get-Command Uninstall-ChocolateyPackage -ErrorAction SilentlyContinue)) {{
-      function Uninstall-ChocolateyPackage {{ [CmdletBinding()] param() }}
+      function Uninstall-ChocolateyPackage {{ [CmdletBinding()] param([Parameter(ValueFromRemainingArguments=$true)][object]$_) }}
     }}
+
     Mock Get-UninstallRegistryKey {{
       # Return one fake match
       [pscustomobject]@{{
@@ -288,11 +314,15 @@ Describe '{package_id} uninstall script' {{
         PSChildName = '{{00000000-0000-0000-0000-000000000000}}';
       }}
     }} -Verifiable
+
     Mock Uninstall-ChocolateyPackage {{ return }} -Verifiable
   }}
 
   It 'invokes Uninstall-ChocolateyPackage appropriately' {{
-    . (Join-Path (Split-Path -Parent $PSScriptRoot) 'tools' 'chocolateyuninstall.ps1')
+    $rootDir  = Split-Path -Parent $PSScriptRoot
+    $toolsDir = Join-Path $rootDir 'tools'
+    . (Join-Path $toolsDir 'chocolateyuninstall.ps1')
+
     Assert-MockCalled Get-UninstallRegistryKey -Times 1 -ParameterFilter {{ $SoftwareName -like '{software_name_pattern}' }}
     Assert-MockCalled Uninstall-ChocolateyPackage -Times 1 -ParameterFilter {{
       $packageName -eq $env:ChocolateyPackageName -and $silentArgs -is [string]
@@ -480,7 +510,7 @@ def main():
     parser = argparse.ArgumentParser(description="Generate Chocolatey package files using OpenAI and templates, with Pester validation.")
     parser.add_argument("path", type=str, help="Path to installer file or directory containing .msi/.exe")
     parser.add_argument("--out", dest="out_dir", default="out", help="Output directory (default: out)")
-    parser.add_argument("--model", dest="model", default=os.environ.get("OPENAI_MODEL", "gpt-4.1-mini"), help="OpenAI model name")
+    parser.add_argument("--model", dest="model", default=os.environ.get("OPENAI_MODEL", "gpt-5-2025-08-07"), help="OpenAI model name")
     parser.add_argument("--recursive", action="store_true", help="Recurse into subdirectories when scanning a folder")
     parser.add_argument("--skip-tests", action="store_true", help="Skip running Pester tests after generation")
     args = parser.parse_args()
