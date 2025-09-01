@@ -231,6 +231,16 @@ Describe '{package_id} install script' {{
   BeforeAll {{
     $env:ChocolateyPackageName = '{package_id}'
     $script:toolsDir = Join-Path (Split-Path -Parent $PSScriptRoot) 'tools'
+    # Load Chocolatey helpers if available, otherwise create minimal stubs so Pester can Mock
+    try {{
+      if ($env:ChocolateyInstall) {{
+        $helpers = Join-Path $env:ChocolateyInstall 'helpers\\chocolateyInstaller.psm1'
+        if (Test-Path $helpers) {{ Import-Module $helpers -ErrorAction SilentlyContinue }}
+      }}
+    }} catch {{}}
+    if (-not (Get-Command Install-ChocolateyInstallPackage -ErrorAction SilentlyContinue)) {{
+      function Install-ChocolateyInstallPackage {{ [CmdletBinding()] param() }}
+    }}
     # Ensure dummy files exist so Test-Path succeeds if needed
     New-Item -ItemType Directory -Force -Path $script:toolsDir | Out-Null
     if (-not (Test-Path (Join-Path $script:toolsDir '{installer_base_name}'))) {{ New-Item -ItemType File -Path (Join-Path $script:toolsDir '{installer_base_name}') | Out-Null }}
@@ -257,6 +267,19 @@ Describe '{package_id} install script' {{
 Describe '{package_id} uninstall script' {{
   BeforeAll {{
     $env:ChocolateyPackageName = '{package_id}'
+    # Load Chocolatey helpers if available, otherwise create minimal stubs so Pester can Mock
+    try {{
+      if ($env:ChocolateyInstall) {{
+        $helpers = Join-Path $env:ChocolateyInstall 'helpers\\chocolateyInstaller.psm1'
+        if (Test-Path $helpers) {{ Import-Module $helpers -ErrorAction SilentlyContinue }}
+      }}
+    }} catch {{}}
+    if (-not (Get-Command Get-UninstallRegistryKey -ErrorAction SilentlyContinue)) {{
+      function Get-UninstallRegistryKey {{ [CmdletBinding()] param([string]$SoftwareName) }}
+    }}
+    if (-not (Get-Command Uninstall-ChocolateyPackage -ErrorAction SilentlyContinue)) {{
+      function Uninstall-ChocolateyPackage {{ [CmdletBinding()] param() }}
+    }}
     Mock Get-UninstallRegistryKey {{
       # Return one fake match
       [pscustomobject]@{{
