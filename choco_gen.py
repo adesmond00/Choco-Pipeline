@@ -287,6 +287,8 @@ param(
   [switch]$InstallPester
 )
 
+$ErrorActionPreference = 'Stop'
+
 if ($InstallPester) {{
   try {{
     if (-not (Get-Module -ListAvailable -Name Pester)) {{
@@ -302,7 +304,13 @@ if (-not (Get-Module -Name Pester)) {{
   exit 2
 }}
 
-Invoke-Pester -Path '{tests_dir}' -CI
+# Use a version-agnostic invocation
+try {{
+  Invoke-Pester -Path '{tests_dir}' -EnableExit
+}} catch {{
+  # Fallback without -EnableExit if not supported
+  Invoke-Pester -Path '{tests_dir}'
+}}
 """.strip()
     write_if_changed(package_dir / "Run-Pester.ps1", runner)
 
