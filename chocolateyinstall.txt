@@ -1,0 +1,33 @@
+$ErrorActionPreference = 'Stop'
+$toolsDir = "$(Split-Path -parent $MyInvocation.MyCommand.Definition)"
+
+# Path to your embedded installer
+$fileLocation = Join-Path $toolsDir "GoogleChromeStandaloneEnterprise64"
+
+# Determine if it's MSI or EXE
+if (Test-Path "$fileLocation.msi") {
+    $fileLocation = "$fileLocation.msi"
+    $fileType = 'MSI'
+    $silentArgs = "/qn /norestart /l*v `"$($env:TEMP)\$($env:ChocolateyPackageName).MsiInstall.log`""
+} else {
+    # Assume it's an EXE (most Chrome Enterprise installers are)
+    if (!(Test-Path $fileLocation) -and (Test-Path "$fileLocation.exe")) {
+        $fileLocation = "$fileLocation.exe"
+    }
+    $fileType = 'EXE'
+    $silentArgs = '/silent /install'
+}
+
+$packageArgs = @{
+    packageName   = $env:ChocolateyPackageName
+    fileType      = $fileType
+    file          = $fileLocation
+    softwareName  = 'Google Chrome*'
+    silentArgs    = $silentArgs
+    validExitCodes= @(0, 3010, 1641)
+}
+
+# Use Install-ChocolateyInstallPackage for embedded installers
+Install-ChocolateyInstallPackage @packageArgs
+
+Write-Host "Google Chrome Enterprise installed successfully" -ForegroundColor Green

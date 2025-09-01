@@ -1,0 +1,38 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>chrome</id>
+    <version>131.0.6778.108</version>
+    <packageSourceUrl>https://github.com/yourcompany/chocolatey-packages</packageSourceUrl>
+    <owners>Your Company</owners>
+    <title>Google Chrome Enterprise</title>
+    <authors>Google Inc.</authors>
+    <projectUrl>https://www.google.com/chrome/business/</projectUrl>
+    <iconUrl>https://www.google.com/chrome/static/images/chrome-logo.svg</iconUrl>
+    <copyright>2025 Google Inc.</copyright>
+    <licenseUrl>https://www.google.com/chrome/terms/</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <projectSourceUrl>https://chromium.googlesource.com/chromium/src/</projectSourceUrl>
+    <docsUrl>https://support.google.com/chrome/</docsUrl>
+    <mailingListUrl>https://groups.google.com/a/chromium.org/forum/#!forum/chromium-discuss</mailingListUrl>
+    <bugTrackerUrl>https://bugs.chromium.org/</bugTrackerUrl>
+    <tags>browser chrome google enterprise admin</tags>
+    <summary>Google Chrome web browser for enterprise deployment</summary>
+    <description>Google Chrome is a web browser developed by Google. This package contains the enterprise version suitable for corporate deployment with centralized management capabilities.
+
+## Features
+* Fast and secure web browsing
+* Enterprise policy management
+* Automatic updates (can be controlled via policy)
+* Integration with Google Workspace
+* Advanced security features
+
+## Package Notes
+This package installs the Google Chrome Enterprise browser with silent installation parameters suitable for automated deployment.
+    </description>
+    <releaseNotes>https://chromereleases.googleblog.com/</releaseNotes>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>
